@@ -20,7 +20,18 @@ package org.apache.zookeeper.server.quorum;
 
 import org.apache.zookeeper.server.quorum.QuorumPeer.ServerState;
 
+/**
+ * 票箱(投票信息)
+ * Map<Long, Vote> recvset: key(我是谁)，value(投给了谁)
+ */
 public class Vote {
+
+    private final int version;
+    private final long id;// sid
+    private final long zxid;
+    private final long electionEpoch;//  logicClock
+    private final long peerEpoch;
+    private final ServerState state;
 
     public Vote(long id, long zxid) {
         this.version = 0x0;
@@ -67,16 +78,6 @@ public class Vote {
         this.version = 0x0;
     }
 
-    private final int version;
-
-    private final long id;
-
-    private final long zxid;
-
-    private final long electionEpoch;
-
-    private final long peerEpoch;
-
     public int getVersion() {
         return version;
     }
@@ -101,7 +102,6 @@ public class Vote {
         return state;
     }
 
-    private final ServerState state;
 
     @Override
     public boolean equals(Object o) {

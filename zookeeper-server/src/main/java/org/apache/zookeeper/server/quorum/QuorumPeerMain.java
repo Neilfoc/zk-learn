@@ -70,6 +70,10 @@ import org.slf4j.LoggerFactory;
  * "myid" that contains the server id as an ASCII decimal value.
  *
  */
+
+/**
+ * Leader选举源码
+ */
 @InterfaceAudience.Public
 public class QuorumPeerMain {
 
