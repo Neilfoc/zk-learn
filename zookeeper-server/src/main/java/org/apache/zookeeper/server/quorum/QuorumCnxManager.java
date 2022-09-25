@@ -95,6 +95,10 @@ import org.slf4j.LoggerFactory;
  *
  */
 
+/**
+ * 网络通信组件:四个线程 四个队列
+ * https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/d0aa44efb60645b0adf6dca1bb5f1bac~tplv-k3u1fbpfcp-zoom-in-crop-mark:3024:0:0:0.awebp?
+ */
 public class QuorumCnxManager {
 
     private static final Logger LOG = LoggerFactory.getLogger(QuorumCnxManager.class);
@@ -156,14 +160,14 @@ public class QuorumCnxManager {
     /*
      * Mapping from Peer to Thread number
      */
-    final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
-    final ConcurrentHashMap<Long, BlockingQueue<ByteBuffer>> queueSendMap;
-    final ConcurrentHashMap<Long, ByteBuffer> lastMessageSent;
+    final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;// 发送者worker
+    final ConcurrentHashMap<Long, BlockingQueue<ByteBuffer>> queueSendMap;// 发送队列
+    final ConcurrentHashMap<Long, ByteBuffer> lastMessageSent; //
 
     /*
      * Reception queue
      */
-    public final BlockingQueue<Message> recvQueue;
+    public final BlockingQueue<Message> recvQueue; // 接收队列
 
     /*
      * Shutdown flag
@@ -462,6 +466,7 @@ public class QuorumCnxManager {
 
     }
 
+    // 节点之间建立连接：只能和比自己 myid 小的节点进行连接
     private boolean startConnection(Socket sock, Long sid) throws IOException {
         DataOutputStream dout = null;
         DataInputStream din = null;
@@ -1225,7 +1230,7 @@ public class QuorumCnxManager {
                 LOG.error("BufferUnderflowException ", be);
                 return;
             }
-            dout.writeInt(b.capacity());
+            dout.writeInt(b.capacity());// 先将buffer的长度写入
             dout.write(b.array());
             dout.flush();
         }
@@ -1420,7 +1425,7 @@ public class QuorumCnxManager {
         final ByteBuffer buffer) {
         final boolean success = queue.offer(buffer);
         if (!success) {
-          throw new RuntimeException("Could not insert into receive queue");
+          throw new RuntimeException("Could not insert into send queue");
         }
     }
 
