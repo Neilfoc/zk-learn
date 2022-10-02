@@ -34,22 +34,29 @@ import org.apache.zookeeper.common.Time;
  */
 public class ExpiryQueue<E> {
 
+    // key是SessionImpl value是过期时间：可用于更新session的过期时间
     private final ConcurrentHashMap<E, Long> elemMap = new ConcurrentHashMap<E, Long>();
     /**
      * The maximum number of buckets is equal to max timeout/expirationInterval,
      * so the expirationInterval should not be too small compared to the
      * max timeout that this expiry queue needs to maintain.
      */
+    // key是过期时间，value是Session集合（会话桶）
+    // key巧妙地采取了将过期时间都计算为 tickTime 倍数的方式来规避桶离散度过高的问题
     private final ConcurrentHashMap<Long, Set<E>> expiryMap = new ConcurrentHashMap<Long, Set<E>>();
 
+    // 下一个过期的时间点【用来干预失效的重要字段】
     private final AtomicLong nextExpirationTime = new AtomicLong();
+    // 过期时间间隔
     private final int expirationInterval;
 
     public ExpiryQueue(int expirationInterval) {
         this.expirationInterval = expirationInterval;
+        // 默认是当前 tickTime 执行时间
         nextExpirationTime.set(roundToNextInterval(Time.currentElapsedTime()));
     }
 
+    // 计算过期时间，结果是tickTime的整数倍。 tickTime就是expirationInterval
     private long roundToNextInterval(long time) {
         return (time / expirationInterval + 1) * expirationInterval;
     }
@@ -81,6 +88,7 @@ public class ExpiryQueue<E> {
      * @return time at which the element is now set to expire if
      *                 changed, or null if unchanged
      */
+    // 更新session的失效时间
     public Long update(E elem, int timeout) {
         Long prevExpiryTime = elemMap.get(elem);
         long now = Time.currentElapsedTime();
@@ -92,6 +100,7 @@ public class ExpiryQueue<E> {
         }
 
         // First add the elem to the new expiry time bucket in expiryMap.
+        // 1.把这个session放入新的过期时间会话桶里
         Set<E> set = expiryMap.get(newExpiryTime);
         if (set == null) {
             // Construct a ConcurrentHashSet using a ConcurrentHashMap
@@ -107,6 +116,7 @@ public class ExpiryQueue<E> {
 
         // Map the elem to the new expiry time. If a different previous
         // mapping was present, clean up the previous expiry bucket.
+        // 2.把这个session从旧的会话桶里面去除
         prevExpiryTime = elemMap.put(elem, newExpiryTime);
         if (prevExpiryTime != null && !newExpiryTime.equals(prevExpiryTime)) {
             Set<E> prevSet = expiryMap.get(prevExpiryTime);
@@ -120,8 +130,10 @@ public class ExpiryQueue<E> {
     /**
      * @return milliseconds until next expiration time, or 0 if has already past
      */
+    // 返回nextExpirationTime 和 当前时间的差值
     public long getWaitTime() {
         long now = Time.currentElapsedTime();
+        // session过期定时任务.1. 获取下一个过期时间点
         long expirationTime = nextExpirationTime.get();
         return now < expirationTime ? (expirationTime - now) : 0L;
     }
@@ -134,21 +146,27 @@ public class ExpiryQueue<E> {
      * @return next set of expired elements, or an empty set if none are
      *         ready
      */
+    // 取出过期的session集合，从会话桶中移除
     public Set<E> poll() {
         long now = Time.currentElapsedTime();
+        // 1. 先取出当前的下一次过期时间点
         long expirationTime = nextExpirationTime.get();
         if (now < expirationTime) {
             return Collections.emptySet();
         }
 
         Set<E> set = null;
+        // 2. 然后让下一次过期时间点 + tickTime（周期执行的时间）的结果成为我们最新下一次过期时间
         long newExpirationTime = expirationTime + expirationInterval;
+        // 3. CAS将最新下一次过期时间更新到nextExpirationTime中
         if (nextExpirationTime.compareAndSet(expirationTime, newExpirationTime)) {
+            // 4. 从Session会话桶中移除key，也就意味着这个key对应的所有Session都被移除了
             set = expiryMap.remove(expirationTime);
         }
         if (set == null) {
             return Collections.emptySet();
         }
+        // 5. 将移除的Session集合返回
         return set;
     }
 
