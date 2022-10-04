@@ -67,6 +67,8 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
     }
 
     @Override
+    // Follower初始化责任链链条，这里firstProcessor就是FollowerRequestProcessor
+    // FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
     protected void setupRequestProcessors() {
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
         commitProcessor = new CommitProcessor(finalProcessor, Long.toString(getServerId()), true, getZooKeeperServerListener());
