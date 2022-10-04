@@ -120,7 +120,9 @@ public class Observer extends Learner {
                 completedSync = true;
                 QuorumPacket qp = new QuorumPacket();
                 while (this.isRunning() && nextLearnerMaster.get() == null) {
+                    // 读数据
                     readPacket(qp);
+                    // 处理数据
                     processPacket(qp);
                 }
             } catch (Exception e) {
@@ -177,12 +179,15 @@ public class Observer extends Learner {
         Record txn;
         switch (qp.getType()) {
         case Leader.PING:
+            // 心跳。续期Session
             ping(qp);
             break;
         case Leader.PROPOSAL:
+            // 不处理propose请求
             LOG.warn("Ignoring proposal");
             break;
         case Leader.COMMIT:
+            // 不处理commit请求
             LOG.warn("Ignoring commit");
             break;
         case Leader.UPTODATE:
@@ -195,7 +200,9 @@ public class Observer extends Learner {
             ((ObserverZooKeeperServer) zk).sync();
             break;
         case Leader.INFORM:
+            // 关键在这，inform请求
             ServerMetrics.getMetrics().LEARNER_COMMIT_RECEIVED_COUNT.add(1);
+            // 封装协议
             logEntry = SerializeUtils.deserializeTxn(qp.getData());
             hdr = logEntry.getHeader();
             txn = logEntry.getTxn();
@@ -204,6 +211,7 @@ public class Observer extends Learner {
             request.logLatency(ServerMetrics.getMetrics().COMMIT_PROPAGATION_LATENCY);
             request.setTxnDigest(digest);
             ObserverZooKeeperServer obs = (ObserverZooKeeperServer) zk;
+            // 处理请求：完成写事务日志（是否enabled）和写内存
             obs.commitRequest(request);
             break;
         case Leader.INFORMANDACTIVATE:
