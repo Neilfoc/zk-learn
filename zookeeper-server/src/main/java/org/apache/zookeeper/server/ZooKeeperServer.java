@@ -1576,9 +1576,11 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
 
     public void processPacket(ServerCnxn cnxn, ByteBuffer incomingBuffer) throws IOException {
         // We have the request, now process and setup for next
+        // 将ByteBuffer包装，ByteBuffer就是客户端发送时候的createBB方法
         InputStream bais = new ByteBufferInputStream(incomingBuffer);
         BinaryInputArchive bia = BinaryInputArchive.getArchive(bais);
         RequestHeader h = new RequestHeader();
+        // 将请求头反序列化为RequestHeader对象
         h.deserialize(bia, "header");
 
         // Need to increase the outstanding request count first, otherwise
@@ -1646,6 +1648,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 cnxn.sendCloseSession();
                 cnxn.disableRecv();
             } else {
+                // 封装Request对象
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(), h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 int length = incomingBuffer.limit();
                 if (isLargeRequest(length)) {
@@ -1654,6 +1657,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                     si.setLargeRequestSize(length);
                 }
                 si.setOwner(ServerCnxn.me);
+                // 处理Request对象，也就是真正的处理网络请求
                 submitRequest(si);
             }
         }
