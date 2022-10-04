@@ -1148,10 +1148,12 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             }
         }
         try {
+            // 刷新Session有效期，重新分桶
             touch(si.cnxn);
             boolean validpacket = Request.isValid(si.type);
             if (validpacket) {
                 setLocalSessionFlag(si);
+                // 责任链模式，一层层地处理请求，每个链条负责干不同的事情。
                 firstProcessor.processRequest(si);
                 if (si.cnxn != null) {
                     incInProcess();

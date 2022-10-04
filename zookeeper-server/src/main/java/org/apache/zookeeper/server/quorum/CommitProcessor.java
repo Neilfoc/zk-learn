@@ -72,6 +72,7 @@ import org.slf4j.LoggerFactory;
  * The current implementation solves the third constraint by simply allowing no
  * read requests to be processed in parallel with write requests.
  */
+// 放到queuedWriteRequests队列，通过线程取出处理
 public class CommitProcessor extends ZooKeeperCriticalThread implements RequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(CommitProcessor.class);
@@ -214,6 +215,8 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                     if (requestsToProcess == 0 && !commitIsWaiting) {
                         // Waiting for requests to process
                         while (!stopped && requestsToProcess == 0 && !commitIsWaiting) {
+                            // 等将提议发给 Follower 且得到过半的反馈 ack 后，
+                            // 会进行 notifyAll() 唤醒正在阻塞的 CommitProcessor 线程
                             wait();
                             commitIsWaiting = !committedRequests.isEmpty();
                             requestsToProcess = queuedRequests.size();
@@ -363,6 +366,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                         commitsProcessed++;
 
                         // Process the write inline.
+                        // 被唤醒后，自己没做什么事(拼凑协议)，而是调用下一个processor，即ToBeAppliedRequestProcessor
                         processWrite(request);
 
                         commitIsWaiting = !committedRequests.isEmpty();
@@ -458,6 +462,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         processCommitMetrics(request, true);
 
         long timeBeforeFinalProc = Time.currentElapsedTime();
+        // 调用ToBeAppliedRequestProcessor
         nextProcessor.processRequest(request);
         ServerMetrics.getMetrics().WRITE_FINAL_PROC_TIME.add(Time.currentElapsedTime() - timeBeforeFinalProc);
     }
@@ -579,7 +584,9 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         LOG.debug("Committing request:: {}", request);
         request.commitRecvTime = Time.currentElapsedTime();
         ServerMetrics.getMetrics().COMMITS_QUEUED.add(1);
+        // 放到commit内存队列
         committedRequests.add(request);
+        // notifyAll()，唤醒全部线程
         wakeup();
     }
 

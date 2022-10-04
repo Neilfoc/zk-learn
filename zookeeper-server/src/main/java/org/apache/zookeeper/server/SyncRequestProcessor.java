@@ -49,6 +49,8 @@ import org.slf4j.LoggerFactory;
  *             be null. This change the semantic of txnlog on the observer
  *             since it only contains committed txns.
  */
+// 放入queuedRequests队列中，使用线程取出处理
+// nextProcessor是AckRequestProcessor，负责 ack 相关的处理
 public class SyncRequestProcessor extends ZooKeeperCriticalThread implements RequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(SyncRequestProcessor.class);
@@ -167,6 +169,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 if (si == null) {
                     /* We timed out looking for more writes to batch, go ahead and flush immediately */
                     flush();
+                    // 取出数据
                     si = queuedRequests.take();
                 }
 
@@ -178,12 +181,15 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 ServerMetrics.getMetrics().SYNC_PROCESSOR_QUEUE_TIME.add(startProcessTime - si.syncQueueStartTime);
 
                 // track the number of records written to the log
+                // 将数据追加到事务日志
                 if (zks.getZKDatabase().append(si)) {
                     if (shouldSnapshot()) {
                         resetSnapshotStats();
                         // roll the log
+                        // 要写入新的事务日志文件
                         zks.getZKDatabase().rollLog();
                         // take a snapshot
+                        // 看是否需要写快照文件，如果需要写快照文件就开个线程去生成快照文件
                         if (!snapThreadMutex.tryAcquire()) {
                             LOG.warn("Too busy to snap, skipping");
                         } else {
@@ -206,6 +212,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                     // flushes (writes), then just pass this to the next
                     // processor
                     if (nextProcessor != null) {
+                        // 调用ack链条
                         nextProcessor.processRequest(si);
                         if (nextProcessor instanceof Flushable) {
                             ((Flushable) nextProcessor).flush();
@@ -215,6 +222,8 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 }
                 toFlush.add(si);
                 if (shouldFlush()) {
+                    // 调用flush方法进行刷盘，也就是将数据真正写到磁盘中，
+                    // 因为前面追加到事务日志可能在操作系统的os cache中，这里强刷到磁盘
                     flush();
                 }
                 ServerMetrics.getMetrics().SYNC_PROCESS_TIME.add(Time.currentElapsedTime() - startProcessTime);
@@ -271,6 +280,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         }
     }
 
+    // 负责将事务日志写盘
     public void processRequest(final Request request) {
         Objects.requireNonNull(request, "Request cannot be null");
 

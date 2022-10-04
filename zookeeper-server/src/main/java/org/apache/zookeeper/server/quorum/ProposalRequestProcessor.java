@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
  * This RequestProcessor simply forwards requests to an AckRequestProcessor and
  * SyncRequestProcessor.
  */
+// 处理请求的核心，两阶段提交的第一阶段
 public class ProposalRequestProcessor implements RequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProposalRequestProcessor.class);
@@ -67,17 +68,22 @@ public class ProposalRequestProcessor implements RequestProcessor {
          * call processRequest on the next processor.
          */
 
+        // 如果是Follower/Observer则走if分支，如果是Leader，走else
         if (request instanceof LearnerSyncRequest) {
             zks.getLeader().processSync((LearnerSyncRequest) request);
         } else {
+            // 直接调用下一个processor，这里是CommitProcessor，负责将数据写到内存，写到内存后就可以对外读取了。
             nextProcessor.processRequest(request);
             if (request.getHdr() != null) {
                 // We need to sync and get consensus on any transactions
                 try {
+                    // 向Follower发起提议，通知各个 Follower 节点要写入这个数据到事务日志。
                     zks.getLeader().propose(request);
                 } catch (XidRolloverException e) {
                     throw new RequestProcessorException(e.getMessage(), e);
                 }
+                // 调用SyncRequestProcessor的processRequest
+                // 将数据写入本地事务日志文件，且返回 ack，也就是给自己记一票。
                 syncProcessor.processRequest(request);
             }
         }

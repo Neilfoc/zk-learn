@@ -89,6 +89,7 @@ import org.slf4j.LoggerFactory;
  * outstandingRequests, so that it can take into account transactions that are
  * in the queue to be applied when generating a transaction.
  */
+// 放入队列、通过线程取出处理
 public class PrepRequestProcessor extends ZooKeeperCriticalThread implements RequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(PrepRequestProcessor.class);
@@ -137,6 +138,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
         try {
             while (true) {
                 ServerMetrics.getMetrics().PREP_PROCESSOR_QUEUE_SIZE.add(submittedRequests.size());
+                // 消费请求数据，也就是从内存队列里弹出来一条请求数据
                 Request request = submittedRequests.take();
                 ServerMetrics.getMetrics().PREP_PROCESSOR_QUEUE_TIME
                     .add(Time.currentElapsedTime() - request.prepQueueStartTime);
@@ -152,6 +154,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
                 }
 
                 request.prepStartTime = Time.currentElapsedTime();
+                // 处理请求数据
                 pRequest(request);
             }
         } catch (Exception e) {
@@ -767,6 +770,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
         request.setTxn(null);
 
         try {
+            // 根据请求类型的不同（create/delete/update等），对请求进行封装和逻辑处理
+            // 验证参数后，调用addChangeRecord将请求放到 outstandingChanges 内存队列里
             switch (request.type) {
             case OpCode.createContainer:
             case OpCode.create:
@@ -940,8 +945,10 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
                 request.setTxn(new ErrorTxn(Code.MARSHALLINGERROR.intValue()));
             }
         }
+        // 给请求设置一个zxid
         request.zxid = zks.getZxid();
         ServerMetrics.getMetrics().PREP_PROCESS_TIME.add(Time.currentElapsedTime() - request.prepStartTime);
+        // 调用下一个链条
         nextProcessor.processRequest(request);
     }
 
@@ -1040,6 +1047,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements Req
 
     public void processRequest(Request request) {
         request.prepQueueStartTime = Time.currentElapsedTime();
+        // 将请求放到了内存队列 submittedRequests 中，那肯定会有一个线程不断地从这个内存队列里消费请求数据
         submittedRequests.add(request);
         ServerMetrics.getMetrics().PREP_PROCESSOR_QUEUED.add(1);
     }

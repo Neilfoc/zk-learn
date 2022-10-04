@@ -102,6 +102,7 @@ public class DataTree {
      * This map provides a fast lookup to the datanodes. The tree is the
      * source of truth and is where all the locking occurs
      */
+    // 创建内存节点树，就是个Map
     private final NodeHashMap nodes;
 
     private IWatchManager dataWatches;
@@ -506,10 +507,12 @@ public class DataTree {
                 parent.stat.setCversion(parentCVersion);
                 parent.stat.setPzxid(zxid);
             }
+            // 创建数据节点
             DataNode child = new DataNode(data, longval, stat);
             parent.addChild(childName);
             nodes.postChange(parentName, parent);
             nodeDataSize.addAndGet(getNodeSize(path, child.data));
+            // 将数据节点放到nodes里，path作为key，也就是数据最终写到了这个内存里。
             nodes.put(path, child);
             EphemeralType ephemeralType = EphemeralType.get(ephemeralOwner);
             if (ephemeralType == EphemeralType.CONTAINER) {
@@ -887,6 +890,7 @@ public class DataTree {
             case OpCode.create:
                 CreateTxn createTxn = (CreateTxn) txn;
                 rc.path = createTxn.getPath();
+                // 创建节点到内存
                 createNode(
                     createTxn.getPath(),
                     createTxn.getData(),
