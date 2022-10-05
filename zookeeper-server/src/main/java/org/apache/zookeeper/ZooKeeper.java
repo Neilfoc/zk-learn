@@ -2601,19 +2601,25 @@ public class ZooKeeper implements AutoCloseable {
      * @throws KeeperException If the server signals an error with a non-zero error code.
      * @throws IllegalArgumentException if an invalid path is specified
      */
+    // 更新数据
     public Stat setData(final String path, byte[] data, int version) throws KeeperException, InterruptedException {
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
         final String serverPath = prependChroot(clientPath);
 
+        // 拼凑请求头的逻辑
         RequestHeader h = new RequestHeader();
         h.setType(ZooDefs.OpCode.setData);
         SetDataRequest request = new SetDataRequest();
         request.setPath(serverPath);
         request.setData(data);
         request.setVersion(version);
+        // 处理请求，且将处理结果封装到 SetDataResponse 对象；
         SetDataResponse response = new SetDataResponse();
+        // 调用submitRequest处理请求
+        // 其实和 create 是一样的，都是先把请求放到 outgoingQueue 内存队列，
+        // 然后起个线程异步消费，最后交给 Leader 处理器的责任链来处理。
         ReplyHeader r = cnxn.submitRequest(h, request, response, null);
         if (r.getErr() != 0) {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()), clientPath);

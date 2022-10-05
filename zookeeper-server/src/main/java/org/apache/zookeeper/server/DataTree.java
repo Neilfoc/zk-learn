@@ -590,6 +590,7 @@ public class DataTree {
             nodes.postChange(parentName, parent);
         }
 
+        // 取出并删除
         DataNode node = nodes.get(path);
         if (node == null) {
             throw new KeeperException.NoNodeException();
@@ -657,6 +658,7 @@ public class DataTree {
 
     public Stat setData(String path, byte[] data, int version, long zxid, long time) throws KeeperException.NoNodeException {
         Stat s = new Stat();
+        // 先取出旧数据，更新数据的话肯定是先根据 key 拿出 value，然后进行更改。
         DataNode n = nodes.get(path);
         if (n == null) {
             throw new KeeperException.NoNodeException();
@@ -665,6 +667,7 @@ public class DataTree {
         synchronized (n) {
             lastdata = n.data;
             nodes.preChange(path, n);
+            // 进行修改
             n.data = data;
             n.stat.setMtime(time);
             n.stat.setMzxid(zxid);
@@ -948,12 +951,14 @@ public class DataTree {
                 break;
             case OpCode.delete:
             case OpCode.deleteContainer:
+                // 删除节点
                 DeleteTxn deleteTxn = (DeleteTxn) txn;
                 rc.path = deleteTxn.getPath();
                 deleteNode(deleteTxn.getPath(), header.getZxid());
                 break;
             case OpCode.reconfig:
             case OpCode.setData:
+                // 设置节点数据
                 SetDataTxn setDataTxn = (SetDataTxn) txn;
                 rc.path = setDataTxn.getPath();
                 rc.stat = setData(
