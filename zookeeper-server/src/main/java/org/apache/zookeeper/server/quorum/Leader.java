@@ -210,6 +210,7 @@ public class Leader extends LearnerMaster {
     }
 
     // Pending sync requests. Must access under 'this' lock.
+    // key：zxid， value：Follower/Observer节点列表
     private final Map<Long, List<LearnerSyncRequest>> pendingSyncs = new HashMap<Long, List<LearnerSyncRequest>>();
 
     public synchronized int getNumPendingSyncs() {
@@ -964,6 +965,8 @@ public class Leader extends LearnerMaster {
         }
         // 调用 CommitProcessor 的 commit 方法，目的是唤醒“沉睡”的 CommitProcessor 线程，让其正常工作。
         zk.commitProcessor.commit(p.request);
+        // sync.1. 省略Follower发sync请求给Leader
+        // sync.2. Leader收到请求后给每个Follower/Observer返回数据
         if (pendingSyncs.containsKey(zxid)) {
             for (LearnerSyncRequest r : pendingSyncs.remove(zxid)) {
                 sendSync(r);

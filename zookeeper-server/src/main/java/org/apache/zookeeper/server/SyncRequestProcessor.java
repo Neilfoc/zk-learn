@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
  */
 // 放入queuedRequests队列中，使用线程取出处理
 // nextProcessor是AckRequestProcessor，负责 ack 相关的处理
+// 在followerZookeeperServer链路上，nextProcessor是SendAckRequestProcessor
 public class SyncRequestProcessor extends ZooKeeperCriticalThread implements RequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(SyncRequestProcessor.class);
