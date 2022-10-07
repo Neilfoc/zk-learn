@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
  * This RequestProcessor forwards any requests that modify the state of the
  * system to the Leader.
  */
+// 请求先放入queuedRequests队列，通过线程取出处理
 public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements RequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(FollowerRequestProcessor.class);
@@ -140,6 +141,7 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
                 }
             }
 
+            // 将请求先放入queuedRequests队列
             queuedRequests.add(request);
         }
     }

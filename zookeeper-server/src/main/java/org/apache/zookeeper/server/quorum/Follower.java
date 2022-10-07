@@ -122,7 +122,9 @@ public class Follower extends Learner {
                 // create a reusable packet to reduce gc impact
                 QuorumPacket qp = new QuorumPacket();
                 while (this.isRunning()) {
+                    // 读数据：Leader 发送请求给 Follower 后，Follower 通过此方法将请求数据读到 QuorumPacket 对象中。
                     readPacket(qp);
+                    // 处理数据：处理 Leader 发来的请求数据，也就是 QuorumPacket 对象。
                     processPacket(qp);
                 }
             } catch (Exception e) {
@@ -158,9 +160,11 @@ public class Follower extends Learner {
     protected void processPacket(QuorumPacket qp) throws Exception {
         switch (qp.getType()) {
         case Leader.PING:
+            // 心跳请求，刷新Session的
             ping(qp);
             break;
         case Leader.PROPOSAL:
+            // Leader发来的propose请求
             ServerMetrics.getMetrics().LEARNER_PROPOSAL_RECEIVED_COUNT.add(1);
             TxnLogEntry logEntry = SerializeUtils.deserializeTxn(qp.getData());
             TxnHeader hdr = logEntry.getHeader();
@@ -180,6 +184,7 @@ public class Follower extends Learner {
                 self.setLastSeenQuorumVerifier(qv, true);
             }
 
+            // 将 Leader 提议的数据落盘，然后返回 ack
             fzk.logRequest(hdr, txn, digest);
             if (hdr != null) {
                 /*
@@ -200,7 +205,9 @@ public class Follower extends Learner {
             }
             break;
         case Leader.COMMIT:
+            // Leader发来的commit请求
             ServerMetrics.getMetrics().LEARNER_COMMIT_RECEIVED_COUNT.add(1);
+            // 调用到 FinalRequestProcessor 处理器，将数据写到内存中，写到内存后就对外可访问了。
             fzk.commit(qp.getZxid());
             if (om != null) {
                 final long startTime = Time.currentElapsedTime();

@@ -105,6 +105,7 @@ public class FinalRequestProcessor implements RequestProcessor {
         this.requestPathMetricsCollector = zks.getRequestPathMetricsCollector();
     }
 
+    // 将数据写到内存 Map 中
     public void processRequest(Request request) {
         LOG.debug("Processing request:: {}", request);
 
@@ -117,6 +118,7 @@ public class FinalRequestProcessor implements RequestProcessor {
             ZooTrace.logRequest(LOG, traceMask, 'E', request, "");
         }
 
+        // 最终调用到下面这个方法
         ProcessTxnResult rc = zks.processTxn(request);
 
         // ZOOKEEPER-558:

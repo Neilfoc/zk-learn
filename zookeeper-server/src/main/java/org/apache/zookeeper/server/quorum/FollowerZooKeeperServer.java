@@ -67,6 +67,8 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
     }
 
     @Override
+    // Follower初始化责任链链条，这里firstProcessor就是FollowerRequestProcessor
+    // FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
     protected void setupRequestProcessors() {
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
         commitProcessor = new CommitProcessor(finalProcessor, Long.toString(getServerId()), true, getZooKeeperServerListener());
@@ -110,6 +112,7 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
         commitProcessor.commit(request);
     }
 
+    // sync.3. Follower收到Leader发来的sync请求后
     public synchronized void sync() {
         if (pendingSyncs.size() == 0) {
             LOG.warn("Not expecting a sync.");

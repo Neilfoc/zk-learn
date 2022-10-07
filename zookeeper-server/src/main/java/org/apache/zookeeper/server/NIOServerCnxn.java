@@ -167,6 +167,7 @@ public class NIOServerCnxn extends ServerCnxn {
     /** Read the request payload (everything following the length prefix) */
     private void readPayload() throws IOException, InterruptedException, ClientCnxnLimitException {
         if (incomingBuffer.remaining() != 0) { // have we read length bytes?
+            // 通过socket读取客户端传递来的ByteBuffer
             int rc = sock.read(incomingBuffer); // sock is non-blocking, so ok
             if (rc < 0) {
                 handleFailedRead();
@@ -177,8 +178,10 @@ public class NIOServerCnxn extends ServerCnxn {
             incomingBuffer.flip();
             packetReceived(4 + incomingBuffer.remaining());
             if (!initialized) {
+                // 如果还没初始化，则进行建立连接
                 readConnectRequest();
             } else {
+                // 如果初始化过了，那就读数据
                 readRequest();
             }
             lenBuffer.clear();
@@ -313,6 +316,7 @@ public class NIOServerCnxn extends ServerCnxn {
     /**
      * Handles read/write IO on connection.
      */
+    // isReadable时，处理客户端发来的请求
     void doIO(SelectionKey k) throws InterruptedException {
         try {
             if (!isSocketOpen()) {
@@ -344,6 +348,7 @@ public class NIOServerCnxn extends ServerCnxn {
                         isPayload = true;
                     }
                     if (isPayload) { // not the case for 4letterword
+                        // 解析客户端请求
                         readPayload();
                     } else {
                         // four letter words take care

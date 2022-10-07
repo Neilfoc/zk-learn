@@ -59,6 +59,7 @@ import org.slf4j.LoggerFactory;
  * learner. All communication with a learner is handled by this
  * class.
  */
+// 放入queuedPackets队列，使用线程取出处理
 public class LearnerHandler extends ZooKeeperThread {
 
     private static final Logger LOG = LoggerFactory.getLogger(LearnerHandler.class);
@@ -319,6 +320,7 @@ public class LearnerHandler extends ZooKeeperThread {
         while (true) {
             try {
                 QuorumPacket p;
+                // 取出数据，真正发送
                 p = queuedPackets.poll();
                 if (p == null) {
                     bufferedOutput.flush();
@@ -353,6 +355,7 @@ public class LearnerHandler extends ZooKeeperThread {
                 if (p.getZxid() > 0) {
                     lastZxid = p.getZxid();
                 }
+                // 写入
                 oa.writeRecord(p, "packet");
                 packetsSent.incrementAndGet();
                 messageTracker.trackSent(p.getType());
@@ -600,6 +603,7 @@ public class LearnerHandler extends ZooKeeperThread {
             bufferedOutput.flush();
 
             // Start thread that blast packets in the queue to learner
+            // 发送packet给follower
             startSendingPackets();
 
             /*
@@ -672,6 +676,7 @@ public class LearnerHandler extends ZooKeeperThread {
                         LOG.debug("Received ACK from Observer {}", this.sid);
                     }
                     syncLimitCheck.updateAck(qp.getZxid());
+                    // leader处理follower返回的ack
                     learnerMaster.processAck(this.sid, qp.getZxid(), sock.getLocalSocketAddress());
                     break;
                 case Leader.PING:

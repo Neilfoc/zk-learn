@@ -250,7 +250,10 @@ public class Learner {
             oa.write(b);
         }
         oa.close();
+        // Leader.REQUEST
         QuorumPacket qp = new QuorumPacket(Leader.REQUEST, -1, baos.toByteArray(), request.authInfo);
+        // 直接发个请求给 Leader，然后 Leader 接收到请求后就按照完整的责任链实现 “2PC” 过半 ack 写机制。
+        // 因此 Follower 并不处理写请求，直接转给 Leader了。
         writePacket(qp, true);
     }
 

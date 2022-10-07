@@ -479,6 +479,7 @@ public class ZKDatabase {
      * datatree/zkdatabase
      */
     public ProcessTxnResult processTxn(TxnHeader hdr, Record txn, TxnDigest digest) {
+        // 调用dataTree方法，dataTree就是内存树，也就是Zookeeper内存存储数据的核心类
         return dataTree.processTxn(hdr, txn, digest);
     }
 

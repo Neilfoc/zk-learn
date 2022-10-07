@@ -60,6 +60,7 @@ public class RequestThrottler extends ZooKeeperCriticalThread {
 
     private static final Logger LOG = LoggerFactory.getLogger(RequestThrottler.class);
 
+    // 请求内存队列
     private final LinkedBlockingQueue<Request> submittedRequests = new LinkedBlockingQueue<Request>();
 
     private final ZooKeeperServer zks;
@@ -129,6 +130,7 @@ public class RequestThrottler extends ZooKeeperCriticalThread {
     }
 
     @Override
+    // 处理请求的线程
     public void run() {
         try {
             while (true) {
@@ -136,6 +138,7 @@ public class RequestThrottler extends ZooKeeperCriticalThread {
                     break;
                 }
 
+                // 从内存队列当中弹出一条请求数据
                 Request request = submittedRequests.take();
                 if (Request.requestOfDeath == request) {
                     break;
@@ -171,6 +174,7 @@ public class RequestThrottler extends ZooKeeperCriticalThread {
                     if (request.isStale()) {
                         ServerMetrics.getMetrics().STALE_REQUESTS.add(1);
                     }
+                    // 处理请求
                     zks.submitRequestNow(request);
                 }
             }
@@ -230,6 +234,7 @@ public class RequestThrottler extends ZooKeeperCriticalThread {
             LOG.debug("Shutdown in progress. Request cannot be processed");
             dropRequest(request);
         } else {
+            // 将读出来的请求放到submittedRequests内存队列
             submittedRequests.add(request);
         }
     }

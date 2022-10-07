@@ -45,8 +45,10 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
 
     private static final Logger LOG = LoggerFactory.getLogger(SessionTrackerImpl.class);
 
+    // key：SessionId，value：Session对象
     protected final ConcurrentHashMap<Long, SessionImpl> sessionsById = new ConcurrentHashMap<Long, SessionImpl>();
 
+    // 过期队列。用于维护会话的过期，并且使用bucket来维护会话，每一个bucket对应一个某时间范围内过期的会话。
     private final ExpiryQueue<SessionImpl> sessionExpiryQueue;
 
     private final ConcurrentMap<Long, Integer> sessionsWithTimeout;
@@ -149,17 +151,22 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
     }
 
     @Override
+    // 失效session的定时任务~
     public void run() {
         try {
             while (running) {
+                // 获取时间差值
                 long waitTime = sessionExpiryQueue.getWaitTime();
+                // session过期定时任务.2. 如果下一个过期时间点大于当前时间，则阻塞等待：当前时间 - 下一个过期时间点
                 if (waitTime > 0) {
                     Thread.sleep(waitTime);
                     continue;
                 }
 
+                // session过期定时任务.3. 如果下一个过期时间点小于等于当前时间，则剔除Session，断开链接，更新下一个过期时间点等操作。
                 for (SessionImpl s : sessionExpiryQueue.poll()) {
                     ServerMetrics.getMetrics().STALE_SESSIONS_EXPIRED.add(1);
+                    // 释放 Session 对应的连接，放到队列异步处理
                     setSessionClosing(s.sessionId);
                     expirer.expire(s);
                 }
@@ -170,7 +177,9 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         LOG.info("SessionTrackerImpl exited loop!");
     }
 
+    // 激活session
     public synchronized boolean touchSession(long sessionId, int timeout) {
+        // 先根据SessionId获取到Session
         SessionImpl s = sessionsById.get(sessionId);
 
         if (s == null) {
@@ -178,11 +187,13 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
             return false;
         }
 
+        // 然后判断是否已经close了，如果close了那么直接返回即可，不做其他逻辑处理
         if (s.isClosing()) {
             logTraceTouchClosingSession(sessionId, timeout);
             return false;
         }
 
+        // 如果没关闭，则调用updateSessionExpiry(s, timeout)
         updateSessionExpiry(s, timeout);
         return true;
     }

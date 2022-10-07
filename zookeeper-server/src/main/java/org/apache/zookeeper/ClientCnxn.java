@@ -1577,6 +1577,7 @@ public class ClientCnxn {
         WatchRegistration watchRegistration,
         WatchDeregistration watchDeregistration) throws InterruptedException {
         ReplyHeader r = new ReplyHeader();
+        // 生成packet 并加入到 outgoingQueue 队列中;
         Packet packet = queuePacket(
             h,
             r,
@@ -1689,9 +1690,11 @@ public class ClientCnxn {
                 if (h.getType() == OpCode.closeSession) {
                     closing = true;
                 }
+                // 加入到outgoingQueue队列中
                 outgoingQueue.add(packet);
             }
         }
+        // 向channel 中写一个空字节，唤醒 SendThread 中的 selector
         sendThread.getClientCnxnSocket().packetAdded();
         return packet;
     }

@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
  * Responsible for performing local session upgrade. Only request submitted
  * directly to the leader should go through this processor.
  */
+// 该责任链条作用：进行校验工作，验证了 Session 是否过期
 public class LeaderRequestProcessor implements RequestProcessor {
 
     private static final Logger LOG = LoggerFactory.getLogger(LeaderRequestProcessor.class);
@@ -55,6 +56,7 @@ public class LeaderRequestProcessor implements RequestProcessor {
         // an ephemeral node, in which case we upgrade the session
         Request upgradeRequest = null;
         try {
+            // 检查Session是否过期
             upgradeRequest = lzks.checkUpgradeSession(request);
         } catch (KeeperException ke) {
             if (request.getHdr() != null) {
@@ -68,6 +70,7 @@ public class LeaderRequestProcessor implements RequestProcessor {
             LOG.error("Unexpected error in upgrade", ie);
         }
         if (upgradeRequest != null) {
+            // Session验证通过的话，则直接调起下一个链条
             nextProcessor.processRequest(upgradeRequest);
         }
 

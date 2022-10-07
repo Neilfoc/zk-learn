@@ -210,6 +210,7 @@ public class Leader extends LearnerMaster {
     }
 
     // Pending sync requests. Must access under 'this' lock.
+    // key：zxid， value：Follower/Observer节点列表
     private final Map<Long, List<LearnerSyncRequest>> pendingSyncs = new HashMap<Long, List<LearnerSyncRequest>>();
 
     public synchronized int getNumPendingSyncs() {
@@ -906,6 +907,8 @@ public class Leader extends LearnerMaster {
         // in order to be committed, a proposal must be accepted by a quorum.
         //
         // getting a quorum from all necessary configurations.
+        // 判断 Follower 对 propose 请求返回的 ack 数量是否超过整个集群数量的一半。
+        // 如果返回的ack没过半，则return false。和leader选举用的一个方法。
         if (!p.hasAllQuorums()) {
             return false;
         }
@@ -955,10 +958,15 @@ public class Leader extends LearnerMaster {
             //turnOffFollowers();
         } else {
             p.request.logLatency(ServerMetrics.getMetrics().QUORUM_ACK_LATENCY);
+            // 若 ack 过半，则对所有 Follower 重新发起一个 commit 请求，相当于两阶段提交的第二阶段。
             commit(zxid);
+            // 将请求发送给Observer，让Observer同步数据
             inform(p);
         }
+        // 调用 CommitProcessor 的 commit 方法，目的是唤醒“沉睡”的 CommitProcessor 线程，让其正常工作。
         zk.commitProcessor.commit(p.request);
+        // sync.1. 省略Follower发sync请求给Leader
+        // sync.2. Leader收到请求后给每个Follower/Observer返回数据
         if (pendingSyncs.containsKey(zxid)) {
             for (LearnerSyncRequest r : pendingSyncs.remove(zxid)) {
                 sendSync(r);
@@ -1024,6 +1032,7 @@ public class Leader extends LearnerMaster {
 
         p.addAck(sid);
 
+        // 判断follower的ack是否过半
         boolean hasCommitted = tryToCommit(p, zxid, followerAddr);
 
         // If p is a reconfiguration, multiple other operations may be ready to be committed,
@@ -1079,6 +1088,7 @@ public class Leader extends LearnerMaster {
          *
          * @see org.apache.zookeeper.server.RequestProcessor#processRequest(org.apache.zookeeper.server.Request)
          */
+        // ToBeAppliedRequestProcessor也没做什么事，交给下一个：FinalRequestProcessor
         public void processRequest(Request request) throws RequestProcessorException {
             next.processRequest(request);
 
@@ -1120,6 +1130,7 @@ public class Leader extends LearnerMaster {
      */
     void sendPacket(QuorumPacket qp) {
         synchronized (forwardingFollowers) {
+            // 遍历全部Follower，逐个下发
             for (LearnerHandler f : forwardingFollowers) {
                 f.queuePacket(qp);
             }
@@ -1220,6 +1231,7 @@ public class Leader extends LearnerMaster {
      * @param request
      * @return the proposal that is queued to send to all the members
      */
+    // 向follower发起提议
     public Proposal propose(Request request) throws XidRolloverException {
         /**
          * Address the rollover issue. All lower 32bits set indicate a new leader
@@ -1254,6 +1266,7 @@ public class Leader extends LearnerMaster {
 
             lastProposed = p.packet.getZxid();
             outstandingProposals.put(lastProposed, p);
+            // 发送
             sendPacket(pp);
         }
         ServerMetrics.getMetrics().PROPOSAL_COUNT.add(1);
