@@ -189,13 +189,17 @@ public class Util {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         OutputArchive boa = BinaryOutputArchive.getArchive(baos);
 
+        // 写入事务头
         hdr.serialize(boa, "hdr");
         if (txn != null) {
+            // 写入事务数据
             txn.serialize(boa, "txn");
         }
         if (digest != null) {
+            // 签名
             digest.serialize(boa, "digest");
         }
+        // 返回字节数组
         return baos.toByteArray();
     }
 

@@ -267,6 +267,7 @@ public class FileTxnLog implements TxnLog, Closeable {
     }
 
     @Override
+    // 写事务日志文件
     public synchronized boolean append(TxnHeader hdr, Record txn, TxnDigest digest) throws IOException {
         if (hdr == null) {
             return false;
@@ -280,13 +281,16 @@ public class FileTxnLog implements TxnLog, Closeable {
         } else {
             lastZxidSeen = hdr.getZxid();
         }
+        // 服务刚启动时为null
         if (logStream == null) {
             LOG.info("Creating new log file: {}", Util.makeLogName(hdr.getZxid()));
 
-            logFileWrite = new File(logDir, Util.makeLogName(hdr.getZxid()));
+            logFileWrite = new File(logDir, Util.makeLogName(hdr.getZxid()));//文件名log.zxid
             fos = new FileOutputStream(logFileWrite);
             logStream = new BufferedOutputStream(fos);
             oa = BinaryOutputArchive.getArchive(logStream);
+            // 文件头包含魔数（ZKLG，四个字节）、版本号（固定为 2 ，四个字节）、dbId（ 固定为 0，8 个字节）
+            // 16进制：5A4B4C47 00000002 00000000 00000000
             FileHeader fhdr = new FileHeader(TXNLOG_MAGIC, VERSION, dbId);
             fhdr.serialize(oa, "fileheader");
             // Make sure that the magic number is written before padding.
@@ -294,14 +298,18 @@ public class FileTxnLog implements TxnLog, Closeable {
             filePadding.setCurrentSize(fos.getChannel().position());
             streamsToFlush.add(fos);
         }
+        // 固定文件大小，提前填充内容进去，防止文件大小每次变化都会带来一次磁盘 Seek，提升性能。
         filePadding.padFile(fos.getChannel());
+        // 序列化：事务请求头、事务请求体、签名
         byte[] buf = Util.marshallTxnEntry(hdr, txn, digest);
         if (buf == null || buf.length == 0) {
             throw new IOException("Faulty serialization for header " + "and txn");
         }
+        // 基于事务请求头、事务请求体、签名这三者来生成一个校验和
         Checksum crc = makeChecksumAlgorithm();
         crc.update(buf, 0, buf.length);
         oa.writeLong(crc.getValue(), "txnEntryCRC");
+        // 写入文件（实际上是写入了 Buffer 缓冲区，当调用 commit 方法的时候会 flush 刷盘）
         Util.writeTxnBytes(oa, buf);
 
         return true;
