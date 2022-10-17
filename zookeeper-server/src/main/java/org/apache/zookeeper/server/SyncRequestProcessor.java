@@ -143,7 +143,9 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         snapSizeInBytes = size;
     }
 
+    // 是否达到snapCount参数阈值(为了节点们同时生成snapshot文件，使用随机数：randRoll)
     private boolean shouldSnapshot() {
+        //当前已经记录的事务日志数量
         int logCount = zks.getZKDatabase().getTxnCount();
         long logSize = zks.getZKDatabase().getTxnSize();
         return (logCount > (snapCount / 2 + randRoll))
@@ -185,7 +187,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 // 将数据追加到事务日志
                 if (zks.getZKDatabase().append(si)) {
                     if (shouldSnapshot()) {
-                        resetSnapshotStats();
+                        resetSnapshotStats();// 重新设置随机数randRoll
                         // roll the log
                         // 要写入新的事务日志文件
                         zks.getZKDatabase().rollLog();

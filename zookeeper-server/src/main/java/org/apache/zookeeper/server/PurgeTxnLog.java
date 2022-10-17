@@ -74,14 +74,17 @@ public class PurgeTxnLog {
      */
     public static void purge(File dataDir, File snapDir, int num) throws IOException {
         if (num < 3) {
+            // 快照日志数量最小是3
             throw new IllegalArgumentException(COUNT_ERR_MSG);
         }
 
         FileTxnSnapLog txnLog = new FileTxnSnapLog(dataDir, snapDir);
 
+        // 将磁盘上所有快照文件排序，然后放到 list 里。
         List<File> snaps = txnLog.findNValidSnapshots(num);
         int numSnaps = snaps.size();
         if (numSnaps > 0) {
+            // 将事务日志排序，然后将可删除（经过 Filter 过滤后）的快照文件和可删除的（经过 Filter 过滤后）事务日志合并成一个大的数组
             purgeOlderSnapshots(txnLog, snaps.get(numSnaps - 1));
         }
     }
@@ -157,6 +160,7 @@ public class PurgeTxnLog {
             LOG.info(msg);
             System.out.println(msg);
 
+            // 删除文件
             if (!f.delete()) {
                 System.err.println("Failed to remove " + f.getPath());
             }

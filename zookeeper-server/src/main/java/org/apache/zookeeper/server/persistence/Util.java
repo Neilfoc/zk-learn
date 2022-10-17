@@ -91,6 +91,9 @@ public class Util {
      * @param zxid used as a suffix
      * @return file name
      */
+    // 生成快照文件名称
+    // 为什么都要以 .{zxid} 结尾：在恢复事务日志的增量文件时，通过zxid 来确定从哪个事务日志文件开始恢复。
+    // 因为每次生成快照都会同时触发生成新的事务日志文件（根据logStream==null），这样通过恢复的快照文件的尾号+1就能确定从哪个事务文件开始恢复
     public static String makeSnapshotName(long zxid) {
         return FileSnap.SNAPSHOT_FILE_PREFIX + "."
                + Long.toHexString(zxid)

@@ -129,11 +129,12 @@ public class QuorumPeerMain {
         }
 
         // Start and schedule the the purge task
+        // 定期清理磁盘文件
         DatadirCleanupManager purgeMgr = new DatadirCleanupManager(
             config.getDataDir(),
             config.getDataLogDir(),
-            config.getSnapRetainCount(),
-            config.getPurgeInterval());
+            config.getSnapRetainCount(),//保留的快照日志文件数量，最小是3
+            config.getPurgeInterval());//清理任务触发的小时数时间间隔，默认为 0 代表不启动自动清理功能
         purgeMgr.start();
 
         if (args.length == 1 && config.isDistributed()) {

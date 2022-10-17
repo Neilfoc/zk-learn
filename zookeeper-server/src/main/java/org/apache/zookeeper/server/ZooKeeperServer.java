@@ -499,6 +499,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
          *
          * See ZOOKEEPER-1642 for more detail.
          */
+        // 创建snapshot文件时机二：Leader 重新选举，新 Leader 所在机器会检查最近一次快照之后是否有事务日志产生，
+        // 有就对最近的一次事务之前的全量数据做一次数据快照。
         if (zkDb.isInitialized()) {
             setZxid(zkDb.getDataTreeLastProcessedZxid());
         } else {
